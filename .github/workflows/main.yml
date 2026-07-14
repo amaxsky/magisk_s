@@ -15,12 +15,12 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: Checkout official Magisk
+      - name: Checkout your repo
         uses: actions/checkout@v6
-        with:
-          repository: topjohnwu/Magisk
-          path: Magisk
-          submodules: recursive
+
+      - name: Clone official Magisk
+        run: |
+          git clone --recursive https://github.com/topjohnwu/Magisk.git
 
       - name: Fix nested submodules
         run: |
@@ -39,26 +39,27 @@ jobs:
       - name: Patch package name to com.simcom.diaggrab
         run: |
           cd Magisk
+          export LC_ALL=C
           OLD_PKG="com.topjohnwu.magisk"
           NEW_PKG="com.simcom.diaggrab"
 
           echo "== 修改主模块 applicationId =="
-          sed -i '' "s/applicationId \"$OLD_PKG\"/applicationId \"$NEW_PKG\"/" app/build.gradle || true
+          sed -i.bak "s/applicationId \"$OLD_PKG\"/applicationId \"$NEW_PKG\"/" app/build.gradle
 
           echo "== 修改 stub 模块 applicationId =="
-          sed -i '' "s/applicationId \"$OLD_PKG\"/applicationId \"$NEW_PKG\"/" app/stub/build.gradle || true
+          sed -i.bak "s/applicationId \"$OLD_PKG\"/applicationId \"$NEW_PKG\"/" app/stub/build.gradle
 
           echo "== 修改所有 AndroidManifest 包名 =="
-          find app -name "AndroidManifest.xml" -print0 | xargs -0 sed -i '' "s/$OLD_PKG/$NEW_PKG/g"
+          find app -name "AndroidManifest.xml" -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
 
           echo "== 修改所有 Kotlin/Java 包名引用 =="
-          find app -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i '' "s/$OLD_PKG/$NEW_PKG/g"
+          find app -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
 
           echo "== 修改 core 模块包名引用 =="
-          find core -type f -print0 | xargs -0 sed -i '' "s/$OLD_PKG/$NEW_PKG/g"
+          find core -type f -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
 
           echo "== 修改 native 模块包名引用 =="
-          find native -type f -print0 | xargs -0 sed -i '' "s/$OLD_PKG/$NEW_PKG/g"
+          find native -type f -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
 
           echo "== 重命名 Java 包路径（主模块） =="
           if [ -d app/src/main/java/com/topjohnwu/magisk ]; then
@@ -75,7 +76,7 @@ jobs:
           fi
 
           echo "== 修复 BuildConfig 引用 =="
-          find app -type f -print0 | xargs -0 sed -i '' "s/$OLD_PKG.BuildConfig/$NEW_PKG.BuildConfig/g"
+          find app -type f -print0 | xargs -0 sed -i.bak "s/$OLD_PKG.BuildConfig/$NEW_PKG.BuildConfig/g"
 
       - name: Setup environment
         uses: ./.github/actions/setup
