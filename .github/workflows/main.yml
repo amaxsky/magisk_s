@@ -11,8 +11,6 @@ jobs:
   build-diaggrab:
     name: Build Magisk DiagGrab
     runs-on: macos-15
-    strategy:
-      fail-fast: false
 
     steps:
       - name: Checkout your repo
@@ -22,7 +20,7 @@ jobs:
         run: |
           git clone --recursive https://github.com/topjohnwu/Magisk.git
 
-      - name: Fix nested submodules
+      - name: Fix submodules
         run: |
           cd Magisk
           git submodule deinit -f .
@@ -40,43 +38,36 @@ jobs:
         run: |
           cd Magisk
           export LC_ALL=C
-          OLD_PKG="com.topjohnwu.magisk"
-          NEW_PKG="com.simcom.diaggrab"
+          OLD="com.topjohnwu.magisk"
+          NEW="com.simcom.diaggrab"
 
-          echo "== 修改主模块 applicationId =="
-          sed -i.bak "s/applicationId \"$OLD_PKG\"/applicationId \"$NEW_PKG\"/" app/build.gradle
+          echo "== 显示目录结构 =="
+          ls -R .
 
-          echo "== 修改 stub 模块 applicationId =="
-          sed -i.bak "s/applicationId \"$OLD_PKG\"/applicationId \"$NEW_PKG\"/" app/stub/build.gradle
-
-          echo "== 修改所有 AndroidManifest 包名 =="
-          find app -name "AndroidManifest.xml" -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
+          echo "== 修改 AndroidManifest 包名 =="
+          find . -name "AndroidManifest.xml" -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
 
           echo "== 修改所有 Kotlin/Java 包名引用 =="
-          find app -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
+          find . -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
 
-          echo "== 修改 core 模块包名引用 =="
-          find core -type f -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
+          echo "== 修改 native 层包名引用 =="
+          find native -type f -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
 
-          echo "== 修改 native 模块包名引用 =="
-          find native -type f -print0 | xargs -0 sed -i.bak "s/$OLD_PKG/$NEW_PKG/g"
-
-          echo "== 重命名 Java 包路径（主模块） =="
-          if [ -d app/src/main/java/com/topjohnwu/magisk ]; then
+          echo "== 自动重命名 Java 包路径（如果存在旧路径） =="
+          if [ -d app/src/main/java/com/topjohnwu ]; then
             mkdir -p app/src/main/java/com/simcom/diaggrab
-            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/
+            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/ || true
             rm -rf app/src/main/java/com/topjohnwu
           fi
 
-          echo "== 重命名 Java 包路径（stub 模块） =="
-          if [ -d app/stub/src/main/java/com/topjohnwu/magisk ]; then
+          if [ -d app/stub/src/main/java/com/topjohnwu ]; then
             mkdir -p app/stub/src/main/java/com/simcom/diaggrab
-            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/
+            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/ || true
             rm -rf app/stub/src/main/java/com/topjohnwu
           fi
 
           echo "== 修复 BuildConfig 引用 =="
-          find app -type f -print0 | xargs -0 sed -i.bak "s/$OLD_PKG.BuildConfig/$NEW_PKG.BuildConfig/g"
+          find . -type f -print0 | xargs -0 sed -i.bak "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
 
       - name: Setup environment
         uses: ./.github/actions/setup
@@ -99,7 +90,7 @@ jobs:
           path: Magisk/out
           compression-level: 9
 
-      - name: Upload mapping and native debug symbols
+      - name: Upload symbols
         uses: actions/upload-artifact@v6
         with:
           name: diaggrab-${{ github.sha }}-symbols
