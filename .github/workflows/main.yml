@@ -34,15 +34,17 @@ jobs:
           chmod +x app/gradlew
           chmod +x scripts/*.sh || true
 
+      - name: Install correct NDK
+        run: |
+          cd Magisk
+          ./build.py ndk
+
       - name: Patch package name to com.simcom.diaggrab
         run: |
           cd Magisk
           export LC_ALL=C
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
-
-          echo "== 显示目录结构 =="
-          ls -R .
 
           echo "== 修改 AndroidManifest 包名 =="
           find . -name "AndroidManifest.xml" -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
