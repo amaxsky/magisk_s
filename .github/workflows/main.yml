@@ -1,0 +1,74 @@
+name: Magisk DiagGrab Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - ".github/workflows/magisk-diaggrab.yml"
+
+jobs:
+  build-diaggrab:
+    name: Build Magisk (package: com.simcom.diaggrab)
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: Checkout official Magisk
+        uses: actions/checkout@v6
+        with:
+          # 拉官方最新源（你可以改成指定仓库/分支）
+          repository: topjohnwu/Magisk
+          submodules: recursive
+
+      - name: Fix nested submodules
+        run: |
+          git submodule deinit -f .
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Fix permissions
+        run: |
+          chmod +x build.py
+          chmod +x app/gradlew
+          chmod +x scripts/*.sh || true
+
+      - name: Patch package name to com.simcom.diaggrab
+        run: |
+          # 全局替换包名字符串（APK + 二进制里用到的常量）
+          find . -type f \( -name "*.kt" -o -name "*.java" -o -name "*.xml" -o -name "*.gradle" -o -name "AndroidManifest*.xml" \) -print0 \
+            | xargs -0 sed -i '' 's/com\.topjohnwu\.magisk/com.simcom.diaggrab/g'
+
+          # 如果有单独定义常量（例如 Const.kt / Config），再保险处理一下
+          if [ -f app/src/main/java/com/topjohnwu/magisk/core/Const.kt ]; then
+            sed -i '' 's/com\.topjohnwu\.magisk/com.simcom.diaggrab/g' app/src/main/java/com/topjohnwu/magisk/core/Const.kt || true
+          fi
+
+      - name: Setup environment
+        uses: ./.github/actions/setup
+        with:
+          is-asset-build: true
+
+      - name: Build release (DiagGrab)
+        run: ./build.py -vr all
+
+      - name: Build debug (DiagGrab)
+        run: ./build.py -v all
+
+      - name: Stop gradle daemon
+        run: ./app/gradlew --stop
+
+      - name: Upload DiagGrab artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: diaggrab-${{ github.sha }}
+          path: out
+          compression-level: 9
+
+      - name: Upload mapping and native debug symbols
+        uses: actions/upload-artifact@v6
+        with:
+          name: diaggrab-${{ github.sha }}-symbols
+          path: app/apk/build/outputs
+          compression-level: 9
