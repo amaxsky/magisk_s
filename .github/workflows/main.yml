@@ -5,17 +5,10 @@ on:
 
 jobs:
   build-diaggrab:
-    name: Build Magisk DiagGrab
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Force Ubuntu check
-        run: |
-          echo "RUNNER_OS=$RUNNER_OS"
-          echo "HOME=$HOME"
-          uname -a
-
-      - name: Checkout your repo
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install dependencies
@@ -23,7 +16,7 @@ jobs:
           sudo apt update
           sudo apt install -y git python3 python3-pip openjdk-17-jdk unzip rsync
 
-      - name: Clone official Magisk
+      - name: Clone Magisk
         run: |
           git clone --recursive https://github.com/topjohnwu/Magisk.git
 
@@ -34,43 +27,50 @@ jobs:
           git submodule sync --recursive
           git submodule update --init --recursive
 
-      - name: Install correct NDK
+      - name: Install NDK
         run: |
           cd Magisk
           python3 build.py ndk
 
-      - name: Patch package name to com.simcom.diaggrab
+      - name: Patch package name (safe Kotlin DSL patch)
         run: |
           cd Magisk
-          export LC_ALL=C
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
-          echo "== 修改 AndroidManifest 包名 =="
-          find . -name "AndroidManifest.xml" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          echo "== 修正 Gradle Kotlin DSL 包名 =="
+          sed -i 's/namespace = "'$OLD'"/namespace = "'$NEW'"/' app/build.gradle.kts
+          sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/build.gradle.kts
+
+          sed -i 's/namespace = "'$OLD'"/namespace = "'$NEW'"/' app/stub/build.gradle.kts
+          sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/stub/build.gradle.kts
 
           echo "== 修改所有 Kotlin/Java 包名引用 =="
-          find . -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          find app -type f -name "*.kt" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          find app -type f -name "*.java" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
 
-          echo "== 修改 native 层包名引用 =="
+          echo "== 修改 core 模块包名引用 =="
+          find core -type f -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+
+          echo "== 修改 native 模块包名引用 =="
           find native -type f -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
 
-          echo "== 自动重命名 Java 包路径（主模块） =="
-          if [ -d app/src/main/java/com/topjohnwu ]; then
+          echo "== 重命名 Java 包路径（主模块） =="
+          if [ -d app/src/main/java/com/topjohnwu/magisk ]; then
             mkdir -p app/src/main/java/com/simcom/diaggrab
-            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/ || true
+            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/
             rm -rf app/src/main/java/com/topjohnwu
           fi
 
-          echo "== 自动重命名 Java 包路径（stub 模块） =="
-          if [ -d app/stub/src/main/java/com/topjohnwu ]; then
+          echo "== 重命名 Java 包路径（stub 模块） =="
+          if [ -d app/stub/src/main/java/com/topjohnwu/magisk ]; then
             mkdir -p app/stub/src/main/java/com/simcom/diaggrab
-            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/ || true
+            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/
             rm -rf app/stub/src/main/java/com/topjohnwu
           fi
 
           echo "== 修复 BuildConfig 引用 =="
-          find . -type f -print0 | xargs -0 sed -i "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
+          find app -type f -print0 | xargs -0 sed -i "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
 
       - name: Build release
         run: |
