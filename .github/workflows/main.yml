@@ -32,45 +32,50 @@ jobs:
           cd Magisk
           python3 build.py ndk
 
-      - name: Patch package name (safe Kotlin DSL patch)
+      - name: Patch package name safely
         run: |
           cd Magisk
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
           echo "== 修正 Gradle Kotlin DSL 包名 =="
-          sed -i 's/namespace = "'$OLD'"/namespace = "'$NEW'"/' app/build.gradle.kts
-          sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/build.gradle.kts
+          sed -i 's/namespace = "'$OLD'"/namespace = "'$NEW'"/' app/build.gradle.kts || true
+          sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/build.gradle.kts || true
 
-          sed -i 's/namespace = "'$OLD'"/namespace = "'$NEW'"/' app/stub/build.gradle.kts
-          sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/stub/build.gradle.kts
+          if [ -f app/stub/build.gradle.kts ]; then
+            sed -i 's/namespace = "'$OLD'"/namespace = "'$NEW'"/' app/stub/build.gradle.kts || true
+            sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/stub/build.gradle.kts || true
+          fi
 
-          echo "== 修改所有 Kotlin/Java 包名引用 =="
-          find app -type f -name "*.kt" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
-          find app -type f -name "*.java" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          echo "== 修改所有 Kotlin/Java 包名引用（自动跳过不存在目录） =="
+          find app -type f -name "*.kt" -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+          find app -type f -name "*.java" -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
 
-          echo "== 修改 core 模块包名引用 =="
-          find core -type f -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          echo "== 修改 native 包名引用 =="
+          if [ -d native ]; then
+            find native -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+          fi
 
-          echo "== 修改 native 模块包名引用 =="
-          find native -type f -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          echo "== 修改 core 包名引用（如果存在） =="
+          if [ -d core ]; then
+            find core -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+          fi
 
-          echo "== 重命名 Java 包路径（主模块） =="
-          if [ -d app/src/main/java/com/topjohnwu/magisk ]; then
+          echo "== 自动重命名 Java 包路径（如果存在） =="
+          if [ -d app/src/main/java/com/topjohnwu ]; then
             mkdir -p app/src/main/java/com/simcom/diaggrab
-            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/
+            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/ || true
             rm -rf app/src/main/java/com/topjohnwu
           fi
 
-          echo "== 重命名 Java 包路径（stub 模块） =="
-          if [ -d app/stub/src/main/java/com/topjohnwu/magisk ]; then
+          if [ -d app/stub/src/main/java/com/topjohnwu ]; then
             mkdir -p app/stub/src/main/java/com/simcom/diaggrab
-            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/
+            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/ || true
             rm -rf app/stub/src/main/java/com/topjohnwu
           fi
 
           echo "== 修复 BuildConfig 引用 =="
-          find app -type f -print0 | xargs -0 sed -i "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
+          find app -type f -print0 | xargs -0 -r sed -i "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
 
       - name: Build release
         run: |
