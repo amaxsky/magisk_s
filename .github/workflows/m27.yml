@@ -56,8 +56,11 @@ jobs:
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
-          echo "== 修改 APK 的 applicationId（Magisk 27 完全支持） =="
+          echo "== 修改 APK 的 applicationId =="
           sed -i 's/applicationId "'$OLD'"/applicationId "'$NEW'"/' app/build.gradle || true
+          if [ -f app/stub/build.gradle ]; then
+            sed -i 's/applicationId "'$OLD'"/applicationId "'$NEW'"/' app/stub/build.gradle || true
+          fi
 
           echo "== 修改二进制使用的包名（native + rust） =="
           find native -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
