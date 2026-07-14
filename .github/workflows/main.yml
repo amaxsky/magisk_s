@@ -7,6 +7,10 @@ jobs:
   build-diaggrab:
     runs-on: ubuntu-24.04
 
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      PATH: /usr/lib/jvm/java-17-openjdk-amd64/bin:/usr/bin:/bin
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,11 +19,6 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y git python3 python3-pip openjdk-17-jdk unzip rsync
-
-      - name: Force Java 17
-        run: |
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export PATH=$JAVA_HOME/bin:$PATH
 
       - name: Install Android SDK
         run: |
@@ -54,34 +53,30 @@ jobs:
           cd Magisk
           python3 build.py ndk
 
-      - name: Patch ONLY binary package name
+      - name: Patch APK applicationId + binary package name
         run: |
           cd Magisk
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
-          echo "== 只修改二进制使用的包名（native + rust） =="
-
-          if [ -d native ]; then
-            find native -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+          echo "== 修改 APK 的 applicationId（唯一需要改的地方） =="
+          sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/build.gradle.kts || true
+          if [ -f app/stub/build.gradle.kts ]; then
+            sed -i 's/applicationId = "'$OLD'"/applicationId = "'$NEW'"/' app/stub/build.gradle.kts || true
           fi
 
-          if [ -d core ]; then
-            find core -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
-          fi
+          echo "== 修改二进制使用的包名（native + rust） =="
+          find native -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+          find core   -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
 
       - name: Build release
         run: |
           cd Magisk
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export PATH=$JAVA_HOME/bin:$PATH
           python3 build.py -vr all
 
       - name: Build debug
         run: |
           cd Magisk
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export PATH=$JAVA_HOME/bin:$PATH
           python3 build.py -v all
 
       - name: Upload artifacts
