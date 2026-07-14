@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-diaggrab:
-    name: Build Magisk (package: com.simcom.diaggrab)
+    name: Build Magisk
     runs-on: macos-15
     strategy:
       fail-fast: false
