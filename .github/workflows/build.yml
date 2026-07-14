@@ -24,6 +24,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Fix nested submodules
+        run: |
+          git submodule deinit -f .
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
       - name: Fix permissions
         run: |
           chmod +x build.py
@@ -74,7 +80,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Fix nested submodules
+      - name: Fix nested submodules (Windows & Ubuntu)
         run: |
           git submodule deinit -f .
           git submodule sync --recursive
