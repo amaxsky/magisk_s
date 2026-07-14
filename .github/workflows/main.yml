@@ -10,7 +10,7 @@ on:
 jobs:
   build-diaggrab:
     name: Build Magisk DiagGrab
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout your repo
@@ -27,74 +27,44 @@ jobs:
           git submodule sync --recursive
           git submodule update --init --recursive
 
-      - name: Fix permissions
-        run: |
-          cd Magisk
-          chmod +x build.py
-          chmod +x app/gradlew
-          chmod +x scripts/*.sh || true
-
       - name: Install correct NDK
         run: |
           cd Magisk
-          ./build.py ndk
+          python3 build.py ndk
 
-      - name: Patch package name to com.simcom.diaggrab
+      - name: Patch package name
         run: |
           cd Magisk
           export LC_ALL=C
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
-          echo "== 修改 AndroidManifest 包名 =="
-          find . -name "AndroidManifest.xml" -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
+          find . -name "AndroidManifest.xml" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          find . -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+          find native -type f -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
 
-          echo "== 修改所有 Kotlin/Java 包名引用 =="
-          find . -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
-
-          echo "== 修改 native 层包名引用 =="
-          find native -type f -print0 | xargs -0 sed -i.bak "s/$OLD/$NEW/g"
-
-          echo "== 自动重命名 Java 包路径（如果存在旧路径） =="
           if [ -d app/src/main/java/com/topjohnwu ]; then
             mkdir -p app/src/main/java/com/simcom/diaggrab
-            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/ || true
+            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/
             rm -rf app/src/main/java/com/topjohnwu
           fi
 
           if [ -d app/stub/src/main/java/com/topjohnwu ]; then
             mkdir -p app/stub/src/main/java/com/simcom/diaggrab
-            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/ || true
+            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/
             rm -rf app/stub/src/main/java/com/topjohnwu
           fi
 
-          echo "== 修复 BuildConfig 引用 =="
-          find . -type f -print0 | xargs -0 sed -i.bak "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
-
-      - name: Setup environment
-        uses: ./.github/actions/setup
-        with:
-          is-asset-build: true
+          find . -type f -print0 | xargs -0 sed -i "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
 
       - name: Build release
-        run: cd Magisk && ./build.py -vr all
+        run: cd Magisk && python3 build.py -vr all
 
       - name: Build debug
-        run: cd Magisk && ./build.py -v all
+        run: cd Magisk && python3 build.py -v all
 
-      - name: Stop gradle daemon
-        run: cd Magisk && ./app/gradlew --stop
-
-      - name: Upload DiagGrab artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           name: diaggrab-${{ github.sha }}
           path: Magisk/out
-          compression-level: 9
-
-      - name: Upload symbols
-        uses: actions/upload-artifact@v6
-        with:
-          name: diaggrab-${{ github.sha }}-symbols
-          path: Magisk/app/apk/build/outputs
-          compression-level: 9
