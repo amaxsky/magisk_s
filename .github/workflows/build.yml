@@ -22,7 +22,13 @@ jobs:
       - name: Check out
         uses: actions/checkout@v6
         with:
-          submodules: "recursive"
+          submodules: recursive
+
+      - name: Fix permissions
+        run: |
+          chmod +x build.py
+          chmod +x app/gradlew
+          chmod +x scripts/*.sh || true
 
       - name: Setup environment
         uses: ./.github/actions/setup
@@ -59,11 +65,24 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2025, ubuntu-24.04]
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Check out
         uses: actions/checkout@v6
         with:
-          submodules: "recursive"
+          submodules: recursive
+
+      - name: Fix nested submodules
+        run: |
+          git submodule deinit -f .
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Disable CRLF conversion (Windows)
+        if: startsWith(runner.os, 'Windows')
+        run: git config --global core.autocrlf false
 
       - name: Setup environment
         uses: ./.github/actions/setup
