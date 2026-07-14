@@ -2,10 +2,6 @@ name: Magisk DiagGrab Build
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ master ]
-    paths:
-      - ".github/workflows/main.yml"
 
 jobs:
   build-diaggrab:
@@ -13,8 +9,19 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Force Ubuntu check
+        run: |
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "HOME=$HOME"
+          uname -a
+
       - name: Checkout your repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git python3 python3-pip openjdk-17-jdk unzip rsync
 
       - name: Clone official Magisk
         run: |
@@ -32,39 +39,51 @@ jobs:
           cd Magisk
           python3 build.py ndk
 
-      - name: Patch package name
+      - name: Patch package name to com.simcom.diaggrab
         run: |
           cd Magisk
           export LC_ALL=C
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
+          echo "== 修改 AndroidManifest 包名 =="
           find . -name "AndroidManifest.xml" -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+
+          echo "== 修改所有 Kotlin/Java 包名引用 =="
           find . -type f \( -name "*.kt" -o -name "*.java" \) -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
+
+          echo "== 修改 native 层包名引用 =="
           find native -type f -print0 | xargs -0 sed -i "s/$OLD/$NEW/g"
 
+          echo "== 自动重命名 Java 包路径（主模块） =="
           if [ -d app/src/main/java/com/topjohnwu ]; then
             mkdir -p app/src/main/java/com/simcom/diaggrab
-            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/
+            rsync -a app/src/main/java/com/topjohnwu/magisk/ app/src/main/java/com/simcom/diaggrab/ || true
             rm -rf app/src/main/java/com/topjohnwu
           fi
 
+          echo "== 自动重命名 Java 包路径（stub 模块） =="
           if [ -d app/stub/src/main/java/com/topjohnwu ]; then
             mkdir -p app/stub/src/main/java/com/simcom/diaggrab
-            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/
+            rsync -a app/stub/src/main/java/com/topjohnwu/magisk/ app/stub/src/main/java/com/simcom/diaggrab/ || true
             rm -rf app/stub/src/main/java/com/topjohnwu
           fi
 
+          echo "== 修复 BuildConfig 引用 =="
           find . -type f -print0 | xargs -0 sed -i "s/$OLD.BuildConfig/$NEW.BuildConfig/g"
 
       - name: Build release
-        run: cd Magisk && python3 build.py -vr all
+        run: |
+          cd Magisk
+          python3 build.py -vr all
 
       - name: Build debug
-        run: cd Magisk && python3 build.py -v all
+        run: |
+          cd Magisk
+          python3 build.py -v all
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: diaggrab-${{ github.sha }}
           path: Magisk/out
