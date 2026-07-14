@@ -9,7 +9,6 @@ jobs:
 
     env:
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-      PATH: /usr/lib/jvm/java-17-openjdk-amd64/bin:/usr/bin:/bin
 
     steps:
       - name: Checkout
@@ -23,17 +22,17 @@ jobs:
       - name: Install Android SDK
         run: |
           export ANDROID_HOME=$HOME/android-sdk
-          mkdir -p $ANDROID_HOME/cmdline-tools
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
 
-          cd $ANDROID_HOME/cmdline-tools
+          cd "$ANDROID_HOME/cmdline-tools"
           wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
           unzip cmdtools.zip
 
-          mkdir -p $ANDROID_HOME/cmdline-tools/latest
-          mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          mv cmdline-tools/* "$ANDROID_HOME/cmdline-tools/latest/"
           rm -rf cmdline-tools
 
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
@@ -50,19 +49,19 @@ jobs:
           cd Magisk
           python3 build.py ndk
 
-      - name: Patch APK applicationId + binary package name
+      - name: Patch APK manifest package + applicationId + binary package name
         run: |
           cd Magisk
           OLD="com.topjohnwu.magisk"
           NEW="com.simcom.diaggrab"
 
-          echo "== 修改 APK 的 applicationId =="
-          sed -i 's/applicationId "'$OLD'"/applicationId "'$NEW'"/' app/build.gradle || true
-          if [ -f app/stub/build.gradle ]; then
-            sed -i 's/applicationId "'$OLD'"/applicationId "'$NEW'"/' app/stub/build.gradle || true
-          fi
+          echo "== 修改 Manifest 的 package =="
+          sed -i "s/package=\"$OLD\"/package=\"$NEW\"/" app/src/main/AndroidManifest.xml
 
-          echo "== 修改二进制使用的包名（native + rust） =="
+          echo "== 修改 APK 的 applicationId =="
+          sed -i "s/applicationId = \"$OLD\"/applicationId = \"$NEW\"/" app/build.gradle.kts
+
+          echo "== 修改二进制使用的包名 =="
           find native -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
           find core   -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
 
