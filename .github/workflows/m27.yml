@@ -1,0 +1,80 @@
+name: Magisk27-DiagGrab-Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-diaggrab:
+    runs-on: ubuntu-24.04
+
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      PATH: /usr/lib/jvm/java-17-openjdk-amd64/bin:/usr/bin:/bin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install base deps
+        run: |
+          sudo apt update
+          sudo apt install -y git python3 python3-pip openjdk-17-jdk unzip rsync
+
+      - name: Install Android SDK
+        run: |
+          export ANDROID_HOME=$HOME/android-sdk
+          mkdir -p $ANDROID_HOME/cmdline-tools
+
+          cd $ANDROID_HOME/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
+          unzip cmdtools.zip
+
+          mkdir -p $ANDROID_HOME/cmdline-tools/latest
+          mv cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
+          rm -rf cmdline-tools
+
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Clone Magisk 27
+        run: |
+          git clone https://github.com/topjohnwu/Magisk.git
+          cd Magisk
+          git checkout v27.0
+          git submodule update --init --recursive
+
+      - name: Install NDK
+        run: |
+          cd Magisk
+          python3 build.py ndk
+
+      - name: Patch APK applicationId + binary package name
+        run: |
+          cd Magisk
+          OLD="com.topjohnwu.magisk"
+          NEW="com.simcom.diaggrab"
+
+          echo "== 修改 APK 的 applicationId（Magisk 27 完全支持） =="
+          sed -i 's/applicationId "'$OLD'"/applicationId "'$NEW'"/' app/build.gradle || true
+
+          echo "== 修改二进制使用的包名（native + rust） =="
+          find native -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+          find core   -type f -print0 | xargs -0 -r sed -i "s/$OLD/$NEW/g"
+
+      - name: Build release
+        run: |
+          cd Magisk
+          python3 build.py -vr all
+
+      - name: Build debug
+        run: |
+          cd Magisk
+          python3 build.py -v all
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: diaggrab-${{ github.sha }}
+          path: Magisk/out
